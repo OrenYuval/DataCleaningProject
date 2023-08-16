@@ -1,0 +1,1952 @@
+-- Intro --
+
+-- Intro part 1 --
+
+-- Before writing the code itself I will start with understanding the data and its components--
+-- How many rows, different departments and duplicates there are --
+
+				--select * from dbo.DataErrors
+
+				---- 859 rows --
+
+				--select distinct id from dbo.DataErrors
+
+				---- 854 rows --
+
+				--select distinct productname from dbo.DataErrors
+
+				---- 727 rows --
+
+				--select distinct departmentname from dbo.DataErrors
+
+				-- 8 rows of departments overall: --
+
+				--Meat and Poultry
+				--Fruits
+				--Fish
+				--Bakery
+				--Packaged Foods
+				--Beverages
+				--Dairy
+				--Vegetables
+
+----------------------------------------------------------------------------------------------------
+
+-- After the primal data inquiry I've decided to divide this project into missions in order to work properly --
+-- Each section will be labels as a mission --
+
+--			Missions:
+
+--			1. Finding distinct ids and productnames and validating all values are indeed distinct --
+--			2. Finding the product name for each product in the list and adding them to our main table --
+--			3. Making a reference according to a real accurate groceries list from online webpages --
+--			4. Changing the department names according to product names for the departments we already have --
+--			5. Changing the department names accoring to the main product names which have been found on stage 2 --
+--			6. Validating the correct department name for each product and validating all modifications are correct --
+--			7: Validating there are no duplications of products with the same trxdate --
+--			8: Adding the real USD/NIS rates and the accurate trxdate values to our final table --
+
+
+-----------------------------------------------------------------------------------------------------
+
+-- Mission 1a --
+
+-- Before editing the data I built a new table in which all editing will be done, apart from the original table --
+-- First of all we need to ensure there are no null values in the new table we're building --
+
+select * from dbo.DataErrors
+where productname is null
+or departmentname is null
+
+-- id 628 is null
+
+select * from dbo.DataErrors
+where purchasepriceusd is null
+or purchasepricenis is null
+
+-- all products have updated prices
+
+select * from dbo.DataErrors
+where trxdate is null
+or sales is null
+
+-- only product 627 has null values in the trxdate column --
+-- However we might be able to find those values by extracting the excahnge rate of this product --
+-- Later on we will compare it to other products with the same rate and weekday and find out that way the rexdate --
+
+select * into dbo.DataCorrections2
+from dbo.DataErrors
+where productname is not null
+
+--select min(id), max(id) from dbo.DataCorrections2
+---- min_id=1, max_id=1000 --
+
+---- I created another table which contains all the numbers from 1 to 1000. --
+---- Since there are 854 distinct ids between 1 and 1000 it means there are many missing numbers in the ID column --
+
+drop table if exists #ids_to_fill;
+select * 
+into #ids_to_fill
+from dbo.Id_inventory
+where fixed_id not in
+(select id from dbo.DataCorrections2)
+
+-- 147 rows
+
+
+-----------------------------------------------------------------------------------------------------
+
+-- Mission 1b: finding distinct ids and products with duplications --
+-- This stage is needed for removing or re-editing duplications and preventing a situation of a duplicated row and / or id number  --
+
+
+drop table if exists #temp_id;
+select id, count(sales) as total_sales
+into #temp_id
+from dbo.DataCorrections2
+group by id
+having count(sales)>1
+
+---- 3 rows
+
+---- First quering of the duplicated ids - realizing which ids are recurring and whether they referring to the same product --
+
+select * from dbo.DataCorrections2
+where id in
+(select id from #temp_id)
+order by id, productname
+
+-- id 156 has 2 rows, id 256 and 791 have 3 rows each --
+
+
+-- Finding the product names for the duplicated ids we found in the previous table --
+
+			select id, productname, trxdate from dbo.DataCorrections2
+			where productname in
+			(select distinct productname from dbo.DataCorrections2
+			where id in
+			(select id from #temp_id))
+
+---- Throughout this query I found out the excat id duplications and product names in the original table -- 
+---- For example, the product 'Wine - Prosecco Valdobiaddene' has 2 ids: 156 and 689 -- 
+
+---- In order to save further work and eliminate duplications which I found out very early I will update new ids right now --
+---- After those changes I will validate those product names and numbers are unique --
+
+			select * from dbo.DataCorrections2
+			where productname like '%Pasta - Shells, Medium, Dry%'
+
+			-- 1 value - id 156 --
+
+			select * from dbo.DataCorrections2
+			where productname like '%Wine - Prosecco Valdobiaddene%'
+
+			---- 2 values - id 156 and id 689 --
+
+			select * from #ids_to_fill
+			where fixed_id between 680 and 700
+
+			update dbo.DataCorrections2
+			set id=688
+			where productname = 'Wine - Prosecco Valdobiaddene'
+			and trxdate = '2022-07-06'
+
+			select * from dbo.DataCorrections2
+			where productname like '%Wine - Prosecco Valdobiaddene%'
+			or id=156
+
+-------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------
+						
+			-- the product 'Wine - Prosecco Valdobiaddene' already has a distinct id --
+			-- therefore I created a new id for the second product with the same name --
+
+			select * from dbo.DataCorrections2
+			where productname in ('Napkin Colour', 'Langers - Mango Nectar', 'Wine - Taylors Reserve')
+
+			select * from #ids_to_fill
+			where fixed_id between 250 and 270
+
+			update dbo.DataCorrections2
+			set id=255
+			where productname = 'Langers - Mango Nectar'
+
+			update dbo.DataCorrections2
+			set id=257
+			where productname = 'Wine - Taylors Reserve'
+
+			select * from dbo.DataCorrections2
+			where id between 255 and 257
+			and productname in ('Napkin Colour', 'Langers - Mango Nectar', 'Wine - Taylors Reserve')
+
+-----------------------------------------------------------------------------------------------------------
+
+			-- Final validation of the priliminary stage: comparing the main stats to the original table --
+
+				select * from dbo.DataCorrections2
+
+				---- 858 rows - almost same as original table DataErrors but without id 628 where there's no product name --
+
+				select distinct id from dbo.DataCorrections2
+
+				---- 856 rows - makes sense since I've update 3 new ids in this stage minus id 628 --
+
+				select distinct productname from dbo.DataCorrections2
+
+				---- 726 rows - same as original table minus id 628 where there's no product name --
+
+				select distinct departmentname from dbo.DataCorrections2
+
+				-- 8 rows of departments overall: --
+
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+
+-- Mission 2 --
+
+-- In this part I've found out which product names have duplicates and which not --
+-- I have also seperated between the main product names and the whole product names --
+
+drop table if exists #products_with_divider; 
+select id, productname, departmentname, replace(substring(productname,1,CHARINDEX('-',productname)),'-',' ') as mainproductonly
+into #products_with_divider
+from dbo.DataCorrections2
+where CHARINDEX('-',productname) > 0
+
+-- 664 rows
+
+drop table if exists #products_without_divider; 
+select id, productname, departmentname, substring(productname,1,CHARINDEX(' ',productname)) as mainproductonly
+into #products_without_divider
+from dbo.DataCorrections2
+where CHARINDEX('-',productname) = 0
+
+-- 194 rows
+
+drop table if exists #products_with_main_name;
+select * 
+into #products_with_main_name
+from #products_without_divider
+union
+select * from #products_with_divider
+
+-- 856 rows
+
+--select * from #products_with_main_name
+
+-----------------------------------------------------------------------------------------------------
+
+-- Mission 2b: Adding the main names of each product to another table which will be used afterwards -- 
+
+drop table if exists #main_prod_names;
+select mainproductonly, count (*) as frequency,
+ row_number () over (order by mainproductonly) rn
+into #main_prod_names
+from #products_with_main_name
+group by mainproductonly
+having count(*)>1
+
+-- 140 rows
+
+--select * from #main_prod_names
+
+-----------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------
+
+-- Mission 3: Updating the departments of each product according to a real grocery list downloading from the internet --
+
+drop table if exists #data_correction_and_productonly;
+select  distinct c.id,
+		c.productname,
+		p.mainproductonly,
+		c.departmentname,
+		g.department as validated_department,
+		m.rn as rn
+		into #data_correction_and_productonly
+ from dbo.DataCorrections2 c
+left join
+#products_with_main_name p
+on c.id=p.id
+left join dbo.grocerylist g
+on p.mainproductonly=g.productname
+left join #main_prod_names m
+on m.mainproductonly=p.mainproductonly
+
+-- 872 rows
+
+select * from #data_correction_and_productonly
+where mainproductonly not like '% %'
+
+-- 40 rows
+
+-- This is a validation check needed to find out where there is no product name --
+-- Since there are only 40 out of 873 rows - which is less than 5 percent - I find it ok to accept this gap --
+-- The final re-editing will be done in the next stage when each product will be dealt specifically -- 
+
+
+select * from #data_correction_and_productonly
+where validated_department is not null
+
+-- 245 rows
+
+-- For 245 out of 872 rows there is a match between the original table and the table I've uploaded --
+-- It doesn't solve the product department issue complete but it can make some of the work easier for next stages --
+
+-----------------------------------------------------------------------------------------------------
+
+-- Mission 3b: Creating the main table which will be used in order to modify the department names afterwards --
+
+drop table if exists #data_corrections_with_rn;
+select  d.id, 
+		d.productname,
+		p.mainproductonly, 
+		p.validated_department,
+		p.rn 
+		into #data_corrections_with_rn
+from dbo.DataCorrections2 d
+left join #data_correction_and_productonly p
+on d.id=p.id
+
+-- There are 874 rows in the new table I've created -- 
+-- There are some duplications in this table because some products have more than one possible department --
+-- Later on I will drop out the irrelevant rows after validating the correct department --
+
+select * from #data_corrections_with_rn
+
+------------------------------------------------------------------------------------------
+
+-- Mission 3 validating stage --
+
+-- Validating the main columns in the final table are the same as in the original table --
+-- This validation is needed to show there are no duplications of ids in both tables --
+
+select distinct id from #data_corrections_with_rn
+
+---- 856 rows, same as number of ids as in DataCorrections2 --
+
+select distinct productname from #data_corrections_with_rn
+
+---- 726 rows, same as number of product names as in the original file DataErrors --
+
+select distinct d.id, p.id from #data_corrections_with_rn d
+left join #data_correction_and_productonly p
+on d.id=p.id
+where d.productname<>p.productname
+
+--------------------------------------------------------------------------------------
+
+-- Mission 4a: Narrowing the duplications for products with more than one possible department --
+
+drop table if exists #valid_check;
+select id, count(*) as frequency 
+into #valid_check
+from #data_corrections_with_rn
+group by id
+having count(*)>1
+
+-- 17 rows
+
+drop table if exists #double_dept;
+select d.* 
+into #double_dept
+from dbo.#valid_check c
+left join #data_corrections_with_rn d
+on c.id=d.id
+where c.frequency=2
+
+-- 32 rows
+
+select * from #double_dept
+
+select distinct validated_department from #double_dept
+
+-- Fish, Meat & Poultry, Packaged Foods --
+
+-- from this validation check for most of the ingredients we can see there are ids and products that have 2 departments --
+-- this is needed because each product needs to be checked individually and not just up to the main product name --
+-- Another result of this check it that those duplications only apply to 3 departments --
+-- It will make us easier to handle that in a leter stage --
+
+-------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------
+
+-- Now I'm going to find out whether there are products whose names needs adjusting and correcting --
+-- The first stage will be validating the department names I've added from GroceryList table are correct --
+
+select * from #data_corrections_with_rn
+where validated_department like '%meat%'
+
+-- 51 rows before deleting the duplications --
+
+select * from #data_corrections_with_rn
+where validated_department like '%packaged%'
+
+-- 65 rows before deleting the duplications --
+
+-------------------------------------------------------------------------------------------
+
+-- since the meat is one of the double departments I'm first handling the products which have double departments --
+
+select id from #data_corrections_with_rn
+where validated_department like '%meat%'
+and id in
+(select id from #double_dept)
+
+-- 12 rows
+
+-- Upon checking on the internet for the exact pictures of each product I found out that 1 product doesn't fit --
+-- The product 'Chicken - Soup Base' doesn't belong in the meat department, but all 11 other products do belong in the meat department --
+
+delete from #data_corrections_with_rn
+where id = 87 
+and validated_department like '%Meat and Poultry%'
+
+-- 1 rows deleted
+
+delete from #data_corrections_with_rn
+where id in (10, 180, 312, 501, 666, 716, 723, 803, 828, 915, 956)
+and validated_department like '%Packaged Foods%'
+
+-- 11 rows deleted
+
+select * from #data_corrections_with_rn
+where validated_department like '%meat%'
+
+-- 50 rows after deleting 1 value --
+
+select * from #data_corrections_with_rn
+where validated_department like '%packaged%'
+
+-- 54 rows after deleting 11 values --
+
+select * from #data_corrections_with_rn
+
+-- 862 rows after deleting 12 values --
+
+update dbo.DataCorrections2
+set departmentname = 'Meat and Poultry'
+where id in (10, 180, 312, 501, 666, 716, 723, 803, 828, 915, 956)
+
+-- 11 rows
+
+update dbo.DataCorrections2
+set departmentname = 'Packaged Foods'
+where id = 87
+
+select * from dbo.DataCorrections2
+where id in (10, 87, 180, 312, 501, 666, 716, 723, 803, 828, 915, 956)
+
+
+drop table if exists #calssified_ids_a;
+select id 
+into #classified_ids_a
+from dbo.DeptCorrections
+where id in (10, 87, 180, 312, 501, 666, 716, 723, 803, 828, 915, 956)
+
+
+-- 12 rows were added into #classified_ids_a --
+-- In order to avoid a double work I created another table which contains all the IDs I've already classified. --
+-- In that way I can assure I will not overrun the work I've done in this stage --
+
+--------------------------------------------------------------------------------------
+
+-- Now I'm doing the same check of doubles I found in the meat department for fish department --
+
+select * from #data_corrections_with_rn
+where validated_department like '%fish%'
+
+---- 16 rows before deleting the duplications --
+
+select * from #data_corrections_with_rn
+where validated_department like '%packaged%'
+
+----  54 rows before deleting the duplications in the fish department --
+
+select * from #data_corrections_with_rn
+where validated_department like '%fish%'
+and id in
+(select id from #double_dept)
+
+-- 4 rows
+
+-- from checking i found out all of those products are under the definition of fish --
+
+delete from #data_corrections_with_rn
+where id in (95, 221, 451, 533) 
+and validated_department like '%Packaged Foods%'
+
+-- 4 rows
+
+select * from #data_corrections_with_rn
+where id in (95, 221, 451, 533) 
+
+select * from dbo.DataCorrections2
+where id in (95, 221, 451, 533) 
+
+update dbo.DataCorrections2
+set departmentname = 'Fish'
+where id in (95, 221, 451, 533) 
+
+select * from #data_corrections_with_rn
+where validated_department like '%fish%'
+
+select * from dbo.DataCorrections2
+where departmentname like '%Fish%'
+
+-- 16 rows since no fish rows were deleted --
+
+
+---------------------------------------------------------------------------------------
+
+-- Mission 4b: Validating product names are accurate for each department we haven't checked in Mission 4a --
+
+-- Validating for packaged foods department --
+
+select * from #data_corrections_with_rn
+where validated_department like '%Packaged Foods%'
+
+-- 50 rows since 4 rows were deleted --
+-- Right now I am validating the values currently under 'packaged foods' department are accurate  --
+-- After that validation I found out 5 ids need to be re-classified as vegetables --
+
+update #data_corrections_with_rn
+set validated_department = 'Vegetables'
+where id in (36, 435, 477, 536, 639)
+
+update dbo.DataCorrections2
+set departmentname = 'Vegetables'
+where id in (36, 435, 477, 536, 639)
+
+select * from #data_corrections_with_rn
+where validated_department like '%Packaged Foods%'
+
+-- 45 rows after 5 rows were transferred into the vegetables section --
+
+-- In order to avoid a double work I created another table which contains all the IDs I've already classified. --
+-- In that way I can assure I will not overrun the work I've done in this stage --
+
+drop table if exists #classified_ids_b;
+select id 
+into #classified_ids_b
+from dbo.DeptCorrections
+where id in (36, 435, 477, 536, 639, 95, 221, 451, 533)
+
+-- 9 rows were added into another table which contains the IDs which were already classfied at the eariler stage --
+
+--------------------------------------------------------------------------------------
+
+
+-- Validating for bakery department --
+
+
+select * from #data_corrections_with_rn
+where validated_department like '%bakery%'
+
+-- 26 rows. After checking them it seems they are all classified correctly --
+
+--------------------------------------------------------------------------------------
+
+-- Validating for vegetables department --
+
+select * from #data_corrections_with_rn
+where validated_department like '%vegetables%'
+
+-- 30 rows before editing the department values --
+
+update dbo.DataCorrections2
+set departmentname = 'Packaged Foods'
+where id in (88, 133, 194, 334, 410, 523, 607, 825, 948)
+
+update #data_corrections_with_rn
+set validated_department = 'Packaged Foods'
+where id in (88, 133, 194, 334, 410, 523, 607, 825, 948)
+
+--------------------------------------------------------------------------------------
+
+-- Validating for fruits department --
+
+select * from #data_corrections_with_rn
+where validated_department like '%fruits%'
+
+-- 18 rows before editing the department values --
+
+update dbo.DataCorrections2
+set departmentname = 'Fish' 
+where id=16
+
+update dbo.DataCorrections2
+set departmentname = 'Vegetables' 
+where id=21
+
+update dbo.DataCorrections2
+set departmentname = 'Packaged Foods'
+where id in (139, 245, 415, 807 )  
+
+update #data_corrections_with_rn
+set validated_department = 'Fish' 
+where id=16
+
+update #data_corrections_with_rn
+set validated_department = 'Vegetables' 
+where id=21
+
+update #data_corrections_with_rn
+set validated_department = 'Packaged Foods'
+where id in (139, 245, 415, 807 )  
+
+select * from #data_corrections_with_rn
+where validated_department like '%Fruits%'
+
+-- After editing there are 12 rows in fruits dept. --
+
+--------------------------------------------------------------------------
+
+-- Validating for beverages department --
+
+
+select * from #data_corrections_with_rn
+where validated_department like '%beverages%'
+
+-- 23 rows, no editing needed --
+
+--------------------------------------------------------------------------------------
+
+-- Validating for dairy department --
+
+
+select * from #data_corrections_with_rn
+where validated_department like '%dairy%'
+
+-- 11 rows
+
+drop table if exists #classified_ids_c;
+select id 
+into #classified_ids_c
+from dbo.DataCorrections2
+where id in (16, 21, 88, 133, 139, 194, 245, 334, 410, 415, 523, 607, 807, 825, 948)
+
+-- 15 rows were added into another table which contains the IDs which were already classfied at the eariler stage --
+
+--------------------------------------------------------------------------------------
+
+drop table if exists #classified_ids_union;
+select id into 
+#classified_ids_union
+from
+#classified_ids_a
+union
+select * from #classified_ids_b
+union
+select * from #classified_ids_c
+
+-- 36 rows
+
+drop table if exists #excluded_rns;
+select distinct rn 
+into #excluded_rns
+from #data_corrections_with_rn
+where rn is not null
+and id in
+(select id from #classified_ids_union)
+
+-- Finding out which row numbers should be handled manually --
+-- This table will be used to avoid updating those rows in the next stage --
+
+--------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------
+
+-- Mission 5: Changing the product names according to the main product names found on mission 2 --
+
+select * from #data_corrections_with_rn
+where rn not in
+(select rn from #excluded_rns)
+order by rn
+
+-- This is the stage where I classify most of the products according to the main product's name --
+-- Although for some product it can't be for sure it is way more efficient than going manually for each product --
+-- There I will test for each main product 2 or 3 samples and decide to classify upon those samples --
+-- For example, this first main product - Appetizer - has many departments so I won't classify it now but later --
+-- The rest of the checking and validation will be done afterwards at the letters stage --
+-- Since the main table dbo.DataCorrections2 has no rn column but the temp table has them it will be done in 2 phases --
+-- In the first phase I will find out which ids are in each row number, then I will update the main table ids --
+
+--------------------------------------------------------------------------------------------------------------
+
+-- Updating ids for bakery department --
+
+drop table if exists #bakery_ids;
+select id 
+into #bakery_ids
+from #data_corrections_with_rn
+where rn in (9, 13, 16, 33, 43, 44, 74, 84, 90, 91, 116, 127, 128, 137, 138)
+
+update dbo.DataCorrections2
+set departmentname = 'Bakery'
+where id in 
+(select id from #bakery_ids)
+
+-- 67 rows
+
+select distinct departmentname from dbo.DataCorrections2
+where id in 
+(select id from #bakery_ids)
+
+------------------------------------------------------------------------------------------------------------------
+
+-- Updating ids for beverages department --
+
+drop table if exists #beverages_ids;
+select * 
+into #beverages_ids
+from #data_corrections_with_rn
+where rn in (4, 6, 12, 17, 37, 42, 48, 56, 59, 60, 62, 68, 75, 89, 93, 96, 106, 112, 121, 122, 123, 126, 131, 135, 136, 139)
+
+update dbo.DataCorrections2
+set departmentname = 'Beverages'
+where id in 
+(select id from #beverages_ids)
+
+-- 135 rows
+
+select distinct departmentname from dbo.DataCorrections2
+where id in 
+(select id from #beverages_ids)			 
+
+------------------------------------------------------------------------------------------------------------------
+
+-- Updating ids for dairy department --
+
+drop table if exists #dairy_ids;
+select * 
+into #dairy_ids
+from #data_corrections_with_rn
+where rn in (15, 19, 24, 25, 36, 38, 55, 140)
+
+update dbo.DataCorrections2
+set departmentname = 'Dairy'
+where id in 
+(select id from #dairy_ids)
+
+-- 51 rows
+
+ select distinct departmentname from dbo.DataCorrections2
+ where id in 
+(select id from #dairy_ids)
+
+------------------------------------------------------------------------------------------------------------------
+
+-- Updating ids for fish department --
+
+drop table if exists #fish_ids;
+select * 
+into #fish_ids
+from #data_corrections_with_rn
+where rn in (27, 30, 35, 52, 70, 92, 102, 108) 
+
+update dbo.DataCorrections2
+set departmentname = 'Fish' 
+where id in 
+(select id from #fish_ids)
+
+-- 23 rows
+
+ select distinct departmentname from dbo.DataCorrections2
+ where id in 
+(select id from #fish_ids)
+
+------------------------------------------------------------------------------------------------------------------
+
+-- Updating ids for fruits department --
+
+drop table if exists #fruits_ids;
+select * 
+into #fruits_ids
+from #data_corrections_with_rn
+where rn in (3, 77, 98) 
+
+update dbo.DataCorrections2
+set departmentname = 'Fruits'
+where id in 
+(select id from #fruits_ids)
+
+-- 15 rows
+
+select distinct departmentname from dbo.DataCorrections2
+where id in 
+(select id from #fruits_ids)
+
+------------------------------------------------------------------------------------------------------------------
+
+-- Updating ids for household items department --
+
+drop table if exists #household_ids;
+select * 
+into #household_ids
+from #data_corrections_with_rn
+where rn in (8, 14, 41, 45, 46, 49, 51, 63, 66, 67, 76, 82, 109, 111, 113, 117, 119, 120) 
+
+update dbo.DataCorrections2
+set departmentname = 'Household Items'
+where id in 
+(select id from #household_ids)
+
+-- 49 rows
+
+select distinct departmentname from dbo.DataCorrections2
+where id in 
+(select id from #household_ids)
+
+------------------------------------------------------------------------------------------------------------------
+
+-- Updating ids for Meat and Poultry items department --
+
+drop table if exists #meat_and_poultry_ids;
+select * 
+into #meat_and_poultry_ids
+from #data_corrections_with_rn
+where rn in (7, 11, 21, 40, 53, 61, 85, 94, 97, 130, 132, 133)
+
+update dbo.DataCorrections2
+set departmentname = 'Meat and Poultry'
+where id in 
+(select id from #meat_and_poultry_ids)
+
+-- 67 rows
+
+select distinct departmentname from dbo.DataCorrections2
+where id in 
+(select id from #meat_and_poultry_ids)
+
+------------------------------------------------------------------------------------------------------------------
+
+-- Updating ids for Packaged Foods department --
+
+drop table if exists #packaged_foods_ids;
+select * 
+into #packaged_foods_ids
+from #data_corrections_with_rn
+where rn in (22, 23, 26, 29, 32, 39, 54, 57, 58, 69, 78, 83, 99, 105, 107, 110, 118, 124, 134, 137)
+
+update dbo.DataCorrections2
+set departmentname = 'Packaged Foods'
+where id in 
+(select id from #packaged_foods_ids)
+
+-- 99 rows
+
+select distinct departmentname from dbo.DataCorrections2
+where id in 
+(select id from #packaged_foods_ids)
+
+------------------------------------------------------------------------------------------------------------------
+
+-- Updating ids for Vegetables department --
+
+drop table if exists #vegetables_ids;
+select * 
+into #vegetables_ids
+from #data_corrections_with_rn
+where rn in (10, 18, 34, 50, 64, 65, 79, 95, 101, 103, 114, 115)
+
+update dbo.DataCorrections2
+set departmentname = 'Vegetables'
+where id in 
+(select id from #vegetables_ids)
+
+-- 38 rows
+
+select distinct departmentname from dbo.DataCorrections2
+where id in 
+(select id from #vegetables_ids)
+
+------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------
+
+select distinct rn from #data_corrections_with_rn
+where validated_department is null
+
+-- 98 rows left
+
+--------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------
+
+-- Mission 6: Making a drill-down for each product and validating all the previous modifications are correct --
+
+-- After classfying many products according to their main name I'm doing now a drill-down for each specific orpduct --
+-- To do so I'm classifiyng all product names according to their starting letter to make it easier and more accurate --
+
+
+drop table if exists #starting_with_a;
+select *
+into #starting_with_a
+from #data_corrections_with_rn
+where productname like 'a%'
+
+--24 rows
+
+-- this is a validation query used to examine the products starting with a and ensure their names are accurate --
+
+select * from #starting_with_a
+where rn is not null
+order by validated_department
+
+update dbo.DataCorrections2
+set productname = 'Appetizer - Bought'
+where id=1
+
+update dbo.DataCorrections2
+set departmentname = 'Bakery'
+where id in (1, 404, 667)
+
+update dbo.DataCorrections2
+set departmentname = 'Beverages'
+where id = 945
+
+update dbo.DataCorrections2
+set departmentname = 'Fish'
+where id in (201, 234, 291) 
+
+update dbo.DataCorrections2
+set departmentname = 'Fruits'
+where id = 121 
+
+update dbo.DataCorrections2
+set departmentname = 'Meat and Poultry'
+where id in (32, 400, 766, 973)
+
+update dbo.DataCorrections2
+set departmentname = 'Packaged Foods'
+where id in (344, 360)
+
+update dbo.DataCorrections2
+set departmentname = 'Vegetables'
+where id in (467, 618) 
+
+--------------------------------------------------
+
+			drop table if exists #starting_with_b;
+			select *
+			into #starting_with_b
+			from #data_corrections_with_rn
+			where productname like 'b%'
+
+			-- 81 rows
+
+			-- this is a validation query used to examine the products starting with b and ensure their names are accurate --
+
+			select * from #starting_with_b
+			where rn is null
+			order by validated_department
+	
+			update dbo.DataCorrections2
+			set departmentname = 'Bakery'
+			where id in (444, 786) 
+
+			update dbo.DataCorrections2
+			set departmentname = 'Beverages'
+			where id in (26, 281, 490) 
+			
+			update dbo.DataCorrections2
+			set departmentname = 'Fruits'
+			where id in (292, 356, 382, 795, 901)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Household Items'
+			where id in (617, 896) 
+			
+			update dbo.DataCorrections2
+			set departmentname = 'Meat and Poultry'
+			where id = 86
+
+			update dbo.DataCorrections2
+			set departmentname = 'Packaged Foods'
+			where id in (166, 375, 668, 880) 
+
+			update dbo.DataCorrections2
+			set departmentname = 'Vegetables'
+			where id = 963 
+
+			--------------------------------------------------
+
+drop table if exists #starting_with_c;
+select *
+into #starting_with_c
+from #data_corrections_with_rn
+where productname like 'c%'
+
+-- 142 rows
+
+-- this is a validation query used to examine the products starting with c and ensure their names are accurate --
+
+select * from #starting_with_c
+where rn is null
+order by validated_department
+
+update dbo.DataCorrections2
+set productname = 'Chickensplit Half'
+where id=682
+
+update dbo.DataCorrections2
+set departmentname = 'Bakery'
+where id in (186, 475, 525)
+
+update dbo.DataCorrections2
+set departmentname = 'Beverages'
+where id in (35, 74, 171, 351, 747)
+
+update dbo.DataCorrections2
+set departmentname = 'Dairy'
+where id in (30, 128, 647)
+
+update dbo.DataCorrections2
+set departmentname = 'Fish'
+where id in (155, 304, 506, 656, 744) 
+
+update dbo.DataCorrections2
+set departmentname = 'Fruits'
+where id in (314, 551, 582) 
+
+update dbo.DataCorrections2
+set departmentname = 'Household Items'
+where id in (28, 308, 336, 424, 549, 738, 882, 896)
+
+update dbo.DataCorrections2
+set departmentname = 'Meat and Poultry'
+where id in (149, 280)
+
+update dbo.DataCorrections2
+set departmentname = 'Packaged Foods'
+where id in (63, 65, 84, 101, 123, 159, 195, 251, 260, 299, 333, 361, 379, 398, 509, 558, 560, 585, 665, 678, 743, 748, 833)
+
+update dbo.DataCorrections2
+set departmentname = 'Vegetables'
+where id in (6, 238, 746) 
+
+--------------------------------------------------
+
+			drop table if exists #starting_with_d;
+			select *
+			into #starting_with_d
+			from #data_corrections_with_rn
+			where productname like 'd%'
+
+			-- 11 rows
+
+			-- this is a validation query used to examine the products starting with d and ensure their names are accurate --
+
+			select * from #starting_with_d
+			where rn is null
+			order by validated_department
+
+			update dbo.DataCorrections2
+			set departmentname = 'Beverages'
+			where id in (568, 934) 
+
+			update dbo.DataCorrections2
+			set departmentname = 'Dairy'
+			where id in (632, 808)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Fruits'
+			where id = 518
+
+			update dbo.DataCorrections2
+			set departmentname = 'Meat and Poultry'
+			where id in (216, 515)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Packaged Foods'
+			where id in (23, 359, 557)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Vegetables'
+			where id = 782 
+
+			select * from dbo.DeptCorrections
+			where productname like 'd%'
+			order by rn
+
+			--------------------------------------------------
+
+drop table if exists #starting_with_e;
+select *
+into #starting_with_e
+from #data_corrections_with_rn
+where productname like 'e%'
+
+-- 12 rows
+
+select * from #starting_with_e
+where rn is null
+order by validated_department
+
+update dbo.DataCorrections2
+set departmentname = 'Bakery'
+where id in (286, 427)
+
+update dbo.DataCorrections2
+set departmentname = 'Beverages'
+where id = 532
+
+update dbo.DataCorrections2
+set departmentname = 'Dairy'
+where id = 481
+
+update dbo.DataCorrections2
+set departmentname = 'Fish'
+where id = 90
+
+update dbo.DataCorrections2
+set departmentname = 'Fruits'
+where id = 191
+
+update dbo.DataCorrections2
+set departmentname = 'Household Items'
+where id in (91, 426, 499, 831)
+
+update dbo.DataCorrections2
+set departmentname = 'Packaged Foods'
+where id = 713 
+
+update dbo.DataCorrections2
+set departmentname = 'Vegetables'
+where id = 620 
+
+--------------------------------------------------
+
+			drop table if exists #starting_with_f;
+			select *
+			into #starting_with_f
+			from #data_corrections_with_rn
+			where productname like 'f%'
+
+			-- 24 rows
+
+			-- this is a validation query used to examine the products starting with f and ensure their names are accurate --
+
+			select * from #starting_with_f
+			where rn is null
+			order by validated_department
+
+			update dbo.DataCorrections2
+			set departmentname = 'Bakery'
+			where id in (753, 923)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Fish'
+			where id in (395, 860)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Fruits'
+			where id = 418
+
+			update dbo.DataCorrections2
+			set departmentname = 'Household Items'
+			where id in (385, 491)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Meat and Poultry'
+			where id = 371 
+
+			--------------------------------------------------
+
+drop table if exists #starting_with_g;
+select *
+into #starting_with_g
+from dbo.DeptCorrections
+where productname like 'g%'
+
+-- 22 rows
+
+-- this is a validation query used to examine the products starting with g and ensure their names are accurate --
+
+select * from #starting_with_g
+where validated_department is null
+order by productname
+
+update dbo.DataCorrections2
+set departmentname = 'Bakery'
+where id in (141, 239, 637)
+
+update dbo.DataCorrections2
+set departmentname = 'Beverages'
+where id in (715, 894)
+
+update dbo.DataCorrections2
+set departmentname = 'Fruits'
+where id in (59, 368, 886)
+
+update dbo.DataCorrections2
+set departmentname = 'Household Items'
+where id in (34, 144)
+
+update dbo.DataCorrections2
+set departmentname = 'Packaged Foods'
+where id = 288
+
+--------------------------------------------------
+
+			drop table if exists #starting_with_h;
+			select *
+			into #starting_with_h
+			from #data_corrections_with_rn
+			where productname like 'h%'
+
+			-- 9 rows
+
+			-- this is a validation query used to examine the products starting with h and ensure their names are accurate --
+			
+			select * from #starting_with_h
+			where validated_department is null
+			order by productname
+
+			update dbo.DataCorrections2
+			set departmentname = 'Dairy'
+			where id = 763
+
+			--------------------------------------------------
+
+drop table if exists #starting_with_i;
+select *
+into #starting_with_i
+from #data_corrections_with_rn
+where productname like 'i%'
+
+-- 10 rows
+
+-- this is a validation query used to examine the products starting with i and ensure their names are accurate --
+
+select * from #starting_with_i
+where validated_department is null
+order by productname
+
+update dbo.DataCorrections2
+set productname = 'Ice Cream Bar - Del Monte'
+where id=512
+
+update dbo.DataCorrections2
+set productname = 'Ice Cream - Dstk Super Cone'
+where id=917
+
+update dbo.DataCorrections2
+set departmentname = 'Dairy'
+where id in (512, 917)
+
+update dbo.DataCorrections2
+set departmentname = 'Packaged Foods'
+where id = 181
+
+--------------------------------------------------
+
+			drop table if exists #starting_with_j;
+			select *
+			into #starting_with_j
+			from #data_corrections_with_rn
+			where productname like 'j%'
+
+			-- 18 rows
+
+			-- this is a validation query used to examine the products starting with j and ensure their names are accurate --
+
+			select * from #starting_with_j
+			where validated_department is null
+			order by productname
+
+			update dbo.DataCorrections2
+			set departmentname = 'Beverages'
+			where id in (52, 631, 757)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Vegetables'
+			where id = 232 
+
+			--------------------------------------------------
+
+drop table if exists #starting_with_k;
+select *
+into #starting_with_k
+from #data_corrections_with_rn
+where productname like 'k%'
+
+-- 8 rows
+
+-- this is a validation query used to examine the products starting with k and ensure their names are accurate --
+
+select * from #starting_with_k
+where validated_department is null
+order by productname
+
+update dbo.DataCorrections2
+set departmentname = 'Beverages'
+where id = 117
+
+update dbo.DataCorrections2
+set departmentname = 'Fruits'
+where id in (247, 646, 790, 866)
+
+update dbo.DataCorrections2
+set departmentname = 'Household Items'
+where id = 567
+
+update dbo.DataCorrections2
+set departmentname = 'Packaged Foods'
+where id in (68, 887)
+
+--------------------------------------------------
+
+			drop table if exists #starting_with_l;
+			select *
+			into #starting_with_l
+			from #data_corrections_with_rn
+			where productname like 'l%'
+
+			-- 42 rows
+
+			-- this is a validation query used to examine the products starting with l and ensure their names are accurate --
+
+			select * from #starting_with_l
+			where validated_department is null
+			order by productname
+
+			update dbo.DataCorrections2
+			set departmentname = 'Bakery'
+			where id = 151
+
+			update dbo.DataCorrections2
+			set departmentname = 'Beverages'
+			where id = 328
+
+			update dbo.DataCorrections2
+			set departmentname = 'Fruits'
+			where id in (516, 650) 
+
+			update dbo.DataCorrections2
+			set departmentname = 'Meat and Poultry'
+			where id = 814 
+
+			update dbo.DataCorrections2
+			set departmentname = 'Packaged Foods'
+			where id in (855, 989)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Vegetables'
+			where id = 531 
+
+			--------------------------------------------------
+
+drop table if exists #starting_with_m;
+select *
+into #starting_with_m
+from #data_corrections_with_rn
+where productname like 'm%'
+
+-- 30 rows
+
+-- this is a validation query used to examine the products starting with m and ensure their names are accurate --
+
+select * from #starting_with_m
+where validated_department is null
+order by productname
+
+update dbo.DataCorrections2
+set departmentname = 'Bakery'
+where id in (27, 674)
+
+update dbo.DataCorrections2
+set departmentname = 'Beverages'
+where id = 659
+
+update dbo.DataCorrections2
+set departmentname = 'Dairy'
+where id in (61, 77, 152, 218, 461, 895, 939)
+
+update dbo.DataCorrections2
+set departmentname = 'Fish'
+where id = 696 
+
+update dbo.DataCorrections2
+set departmentname = 'Fruits'
+where id in (819, 875)
+
+update dbo.DataCorrections2
+set departmentname = 'Household Items'
+where id in (170, 965)
+
+update dbo.DataCorrections2
+set departmentname = 'Meat and Poultry'
+where id = 437 
+
+update dbo.DataCorrections2
+set departmentname = 'Packaged Foods'
+where id in (13, 373, 561, 725, 778, 903) 
+
+update dbo.DataCorrections2
+set departmentname = 'Vegetables'
+where id = 489
+
+--------------------------------------------------
+
+			drop table if exists #starting_with_n;
+			select *
+			into #starting_with_n
+			from #data_corrections_with_rn
+			where productname like 'n%'
+
+			-- 18 rows
+
+			-- this is a validation query used to examine the products starting with n and ensure their names are accurate --
+
+			select * from #starting_with_n
+			where validated_department is null
+			order by productname
+
+			update dbo.DataCorrections2
+			set productname = 'Napkin - Cocktail, beige 2 - Ply'
+			where id=134 or id=202
+
+			update dbo.DataCorrections2
+			set departmentname = 'Household Items'
+			where id = 564
+
+			update dbo.DataCorrections2
+			set departmentname = 'Packaged Foods'
+			where id in (102, 240) 
+
+			--------------------------------------------------
+
+drop table if exists #starting_with_o;
+select *
+into #starting_with_o
+from #data_corrections_with_rn
+where productname like 'o%'
+
+-- 29 rows
+
+-- this is a validation query used to examine the products starting with o and ensure their names are accurate --
+
+select * from #starting_with_o
+where validated_department is null
+order by productname
+
+update dbo.DataCorrections2
+set productname = 'Oil - Shortening, liqud, Fry'
+where id=995
+
+update dbo.DataCorrections2
+set departmentname = 'Fish'
+where id = 168  
+
+update dbo.DataCorrections2
+set departmentname = 'Fruits'
+where id in (928, 996) 
+
+update dbo.DataCorrections2
+set departmentname = 'Household Items'
+where id in (392, 643, 683)
+
+update dbo.DataCorrections2
+set departmentname = 'Meat and Poultry'
+where id = 231
+
+update dbo.DataCorrections2
+set departmentname = 'Vegetables'
+where id in (184, 717)
+
+--------------------------------------------------
+
+			drop table if exists #starting_with_p;
+			select *
+			into #starting_with_p
+			from dbo.DeptCorrections
+			where productname like 'p%'
+
+			-- 94 rows
+
+			-- this is a validation query used to examine the products starting with p and ensure their names are accurate --
+
+			select * from #starting_with_p
+			where validated_department is null
+			order by productname
+
+			update dbo.DataCorrections2
+			set departmentname = 'Bakery'
+			where id in (345, 563, 708, 735, 922)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Beverages'
+			where id in (55, 854)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Fruits'
+			where id in (172, 190, 479, 636, 950, 968, 988, 999)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Household Items'
+			where id in (150, 422, 478, 492, 543, 762, 826, 845, 941)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Meat and Poultry'
+			where id in (161, 282, 550)  
+
+			update dbo.DataCorrections2
+			set departmentname = 'Packaged Foods'
+			where id in (670, 881) 
+
+			update dbo.DataCorrections2
+			set departmentname = 'Vegetables'
+			where id in (24, 143, 340, 469, 982)
+		
+			--------------------------------------------------
+
+drop table if exists #starting_with_q;
+select *
+into #starting_with_q
+from #data_corrections_with_rn
+where productname like 'q%'
+
+-- 3 rows
+
+-- this is a validation query used to examine the products starting with q and ensure their names are accurate --
+
+select * from #starting_with_q
+where validated_department is null
+order by productname
+
+update dbo.DataCorrections2
+set departmentname = 'Packaged Foods'
+where id = 315
+	
+--------------------------------------------------
+
+			drop table if exists #starting_with_r;
+			select *
+			into #starting_with_r
+			from #data_corrections_with_rn
+			where productname like 'r%'
+
+			-- 15 rows
+
+			-- this is a validation query used to examine the products starting with r and ensure their names are accurate --
+
+			select * from #starting_with_r
+			where validated_department is null
+			order by productname
+
+			update dbo.DataCorrections2
+			set departmentname = 'Beverages'
+			where id in (597, 900)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Fish'
+			where id = 776 
+
+			update dbo.DataCorrections2
+			set departmentname = 'Fruits'
+			where id = 254 
+
+			update dbo.DataCorrections2
+			set departmentname = 'Packaged Foods'
+			where id in (348, 565, 671, 745, 883)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Vegetables'
+			where id in (199, 634, 910)
+					
+			--------------------------------------------------
+
+drop table if exists #starting_with_s;
+select *
+into #starting_with_s
+from dbo.DeptCorrections
+where productname like 's%'
+
+-- 109 rows
+
+-- this is a validation query used to examine the products starting with s and ensure their names are accurate --
+
+select * from #starting_with_s
+where validated_department is null
+order by productname
+
+update dbo.DataCorrections2
+set departmentname = 'Beverages'
+where id in (205, 217, 453, 624, 704, 785, 947, 1000) 
+
+update dbo.DataCorrections2
+set departmentname = 'Fish'
+where id in (271, 365, 460, 548, 775, 783, 958) 
+
+update dbo.DataCorrections2
+set departmentname = 'Fruits'
+where id in (493, 954) 
+
+update dbo.DataCorrections2
+set departmentname = 'Household Items'
+where id in (96, 791, 957, 998)
+
+update dbo.DataCorrections2
+set departmentname = 'Meat and Poultry'
+where id in (176, 562)
+
+update dbo.DataCorrections2
+set departmentname = 'Packaged Foods'
+where id in (41, 54, 119, 283, 325, 412, 480, 843) 
+
+update dbo.DataCorrections2
+set departmentname = 'Vegetables'
+where id in (878, 890, 913) 
+
+--------------------------------------------------
+
+			drop table if exists #starting_with_t;
+			select *
+			into #starting_with_t
+			from #data_corrections_with_rn
+			where productname like 't%'
+
+			-- 48 rows
+
+			-- this is a validation query used to examine the products starting with t and ensure their names are accurate --
+
+			select * from #starting_with_t
+			where validated_department is null
+			order by productname
+
+			update dbo.DataCorrections2
+			set departmentname = 'Bakery'
+			where id = 553 
+
+			update dbo.DataCorrections2
+			set departmentname = 'Beverages'
+			where id in (253, 824)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Fruits'
+			where id = 739 
+
+			update dbo.DataCorrections2
+			set departmentname = 'Household Items'
+			where id in (45, 264, 765)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Packaged Foods'
+			where id in (611, 974)
+
+			update dbo.DataCorrections2
+			set departmentname = 'Vegetables'
+			where id in (528, 616, 823)
+
+			--------------------------------------------------
+
+drop table if exists #starting_with_u;
+select *
+into #starting_with_u
+from #data_corrections_with_rn
+where productname like 'u%'
+
+-- 0 rows
+
+--------------------------------------------------
+
+			drop table if exists #starting_with_v;
+			select *
+			into #starting_with_v
+			from #data_corrections_with_rn
+			where productname like 'v%'
+
+			-- 30 rows
+
+			-- this is a validation query used to examine the products starting with v and ensure their names are accurate --
+
+			select * from #starting_with_v
+			where validated_department is null
+			order by productname
+
+			update dbo.DataCorrections2
+			set productname = 'Veal - Brisket, Provimi, bnls'
+			where id=393
+			
+			update dbo.DataCorrections2
+			set departmentname = 'Fruits'
+			where id = 929 
+
+			update dbo.DataCorrections2
+			set departmentname = 'Meat and Poultry'
+			where id = 575
+
+			update dbo.DataCorrections2
+			set departmentname = 'Packaged Foods'
+			where id in (521, 851, 935)
+			
+			--------------------------------------------------
+
+drop table if exists #starting_with_w;
+select *
+into #starting_with_w
+from #data_corrections_with_rn
+where productname like 'w%'
+
+-- 73 rows
+
+-- this is a validation query used to examine the products starting with w and ensure their names are accurate --
+
+select * from #starting_with_w
+where validated_department is null
+order by productname
+
+update dbo.DataCorrections2
+set productname = 'Wine - Niagara, vqa Reisling'
+where id=571
+
+update dbo.DataCorrections2
+set departmentname = 'Household Items'
+where id in (177, 727)
+
+update dbo.DataCorrections2
+set departmentname = 'Packaged Foods'
+where id = 278 
+
+--------------------------------------------------
+
+			drop table if exists #starting_with_x;
+			select *
+			into #starting_with_x
+			from dbo.DeptCorrections
+			where productname like 'x%'
+
+			-- 0 rows
+
+			--------------------------------------------------
+
+drop table if exists #starting_with_y;
+select *
+into #starting_with_y
+from dbo.DeptCorrections
+where productname like 'y%'
+
+-- 5 rows
+
+-- this is a validation query used to examine the products starting with y and ensure their names are accurate --
+
+select * from #starting_with_y
+where validated_department is null
+order by productname
+
+update dbo.DataCorrections2
+set departmentname = 'Bakery'
+where id = 694
+
+update dbo.DataCorrections2
+set departmentname = 'Dairy'
+where id = 556
+
+--------------------------------------------------
+
+			drop table if exists #starting_with_z;
+			select *
+			into #starting_with_z
+			from #data_corrections_with_rn
+			where productname like 'z%'
+
+			-- 1 row
+
+			select * from #starting_with_z
+					
+			update dbo.DataCorrections2
+			set departmentname = 'Vegetables'
+			where id = 774
+			--------------------------------------------------
+
+			-- final internal validation checking --
+
+--select * from dbo.DataCorrections2 d
+--left join dbo.DeptCorrections p
+--on d.id=p.id
+--where d.departmentname<>p.validated_department	
+--order by p.rn
+
+-------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------
+
+-- Mission 7: Validating there are no duplications of products with the same trxdate --
+
+-- this temp table is used for finding the names of the products who have duplications and might need re-editing --
+
+drop table if exists #temp_productname;
+select productname, count(*) as frequency
+into #temp_productname
+from dbo.DataCorrections2
+group by productname
+having count (*)>1
+
+-- 121 rows
+
+-- finding out all the necccesary details for the prior table --
+
+drop table if exists #temp_full_product_details;
+select d.* 
+into #temp_full_product_details
+from #temp_productname t
+left join dbo.DataErrors d
+on t.productname=d.productname
+order by d.productname
+
+-- 252 rows
+
+drop table if exists #prods_with_dupilcations;
+select 
+productname, 
+count (distinct purchasepriceusd) as sales_count, 
+count (distinct trxdate) as dates_count
+into #prods_with_dupilcations
+from #temp_full_product_details
+group by productname
+having count (distinct trxdate)=1
+
+-- 2 rows
+
+select * from dbo.DataCorrections2 where productname in
+(select productname from #prods_with_dupilcations)
+
+-- this is the list of products with duplication we will need to edit afterwards --
+-- as we've seen before there are 727 unique products where the table has a total of 859 rows. --
+-- from the #temp_full_product_details table I found out there are 121 products with duplications. --
+-- That means there are 132 duplicated values all over this table. --
+-- However most products with duplication have different trxdates, so I made a table only for products with same trxdate --
+
+-- Now we can see that for 'Vodka - Hot, Lnferno' there is one trxdate and one trxdate with null value --
+-- For 'Scrubbie - Scotchbrite Hand Pad' there are 3 rows with the same id --
+
+select productname, sum(sales) from dbo.DataCorrections2 where productname in
+(select productname from #prods_with_dupilcations)
+group by productname
+
+-- the sum of sales for 'Scrubbie - Scotchbrite Hand Pad' is 7884 --
+-- I will add a new row for this product with the total sum of sales in order to avoid confusion later on --
+
+drop table if exists #ids_to_fill2;
+select * 
+into #ids_to_fill2
+from dbo.Id_inventory
+where fixed_id not in
+(select id from dbo.DeptCorrections)
+
+-- 144 rows
+
+select * from #ids_to_fill2
+where fixed_id between 790 and 800
+
+INSERT INTO dbo.DataCorrections2 
+(id, productname, departmentname, purchasepriceusd, purchasepricenis, trxdate, trxweekday, sales) 
+VALUES (792, 'Scrubbie - Scotchbrite Hand Pad', 'Household Items', 323.08, 1740.43, '2022-06-23', 'Thursday', 7884);
+
+--delete from dbo.DataCorrections2
+--where id = 791 
+
+select * from dbo.DataCorrections2
+where id between 790 and 795
+
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+
+-- Mission 8: Adding the real USD/NIS rate to our final table --
+
+select min(trxdate), max (trxdate) from dbo.DataErrors
+
+-- I've used those functions to find out the date ranges for our data in order to retrive the exact data from internet sources --
+-- In order to set the time right I've searched the internet for the exchange rates in the relevant times --
+-- I've also uploaded a table and combined the actual excjange rates with the data we already have --
+
+-- Mission 8a: Updating trxweekday value for rows which refer to Saturday or Sunday --
+
+drop table if exists #last_trxdate;
+select  id, 
+		productname, 
+		departmentname as department, 
+		purchasepriceusd, 
+		purchasepricenis, 
+		trxdate, 
+		trxweekday, 
+		sales, 
+case when trxweekday like '%Saturday%' then DATEADD(dd,-1,trxdate) 
+when trxweekday like '%Sunday%' then DATEADD(dd,-2,trxdate) 
+else trxdate
+end as last_trade_date 
+into #last_trxdate
+from dbo.DataCorrections2
+
+-- 856 rows
+
+drop table if exists #date_rate_origin;
+select d.id, 
+d.productname,
+d.department,
+d.purchasepriceusd,
+round (c.rate*d.purchasepriceusd,2) as actual_purchasepricenis, 
+d.trxdate, 
+d.trxweekday,
+d.sales
+--c.rate as actual_rate,
+--d.purchasepricenis/d.purchasepriceusd as original_rate, 
+into #date_rate_origin
+from #last_trxdate d
+left join [dbo].['USD_ILS - נתונים היסטוריים$'] c
+on d.last_trade_date=c.alterDate
+
+-- 856 rows
+
+-- Mission 8b: Finding whether the date value for one column which has null date value can be calculated --
+
+select * from #date_rate_origin
+where actual_purchasepricenis / purchasepriceusd =
+(select purchasepriceusd/purchasepriceusd as special_rate from #date_rate_origin
+where trxdate is null)
+
+-- unfortunately we found out we can't find out the date for this case so we have to eliminate it --
+
+--delete from dbo.DeptCorrections
+--where id = 627 
+
+
+-- Mission 8c: Adding the updated trxdate values to create a final table --
+
+drop table if exists #validated_trx;
+
+select  id, 
+		productname, 
+		validated_department, 
+		purchasepriceusd, 
+		purchasepricenis,
+		trxdate, 
+		datename(weekday,trxdate) as Validated_trx, 
+		sales
+		into #validated_trx
+from dbo.deptcorrections
+where trxweekday<>datename(weekday,trxdate)
+
+-- 16 rows
+
+drop table if exists #data_correction_final;
+select  id, 
+		productname, 
+		validated_department, 
+		purchasepriceusd, 
+		purchasepricenis,
+		trxdate,
+		trxweekday,
+		sales
+		into #data_correction_final
+from dbo.DeptCorrections
+where id not in
+(select id from #validated_trx)
+union
+select * from #validated_trx
+
+-- 856 rows
+
+-- Final validation
+
+--select * from dbo.DeptCorrections c
+--left join #data_correction_final d 
+--on d.id=c.id
+--where d.validated_department<>c.validated_department
