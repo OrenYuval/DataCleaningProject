@@ -56,6 +56,7 @@ Now after the excercise introduction I'm writing the comments I've written throu
 
 -----------------------------------------------------------------------------------------------------
 -- Mission 1a: checking for null values throughout the table and adding a table for optional new ID values --
+   rows 3-36
 
 -- Before editing the data I built a new table in which all editing will be done, apart from the original table --
 -- First of all we need to ensure there are no null values in the new table we're building --
@@ -72,6 +73,7 @@ select min(id), max(id) from dbo.DataCorrections2
 -----------------------------------------------------------------------------------------------------
 
 -- Mission 1b: finding distinct ids and products with duplications --
+   rows 38-76  
 -- This stage is needed for removing or re-editing duplications and preventing a situation of a duplicated row and / or id number  --
 
 ---- First quering of the duplicated ids - realizing which ids are recurring and whether they referring to the same product --
@@ -85,7 +87,7 @@ select min(id), max(id) from dbo.DataCorrections2
 ---- After those changes I will validate those product names and numbers are unique --
 
 -------------------------------------------------------------------------------------------------------
-						
+   rows 79-97						
 -- the product 'Wine - Prosecco Valdobiaddene' already has a distinct id --
 -- therefore I created a new id for the second product with the same name --
 
@@ -93,19 +95,19 @@ select min(id), max(id) from dbo.DataCorrections2
 ----------------------------------------------------------------------------------------------
 
 -- Mission 2 --
-
+   rows 122-153
 -- In this part I've found out which product names have duplicates and which not --
 -- I have also seperated between the main product names and the whole product names --
 
 -----------------------------------------------------------------------------------------------------
 
 -- Mission 2b: Adding the main names of each product to another table which will be used afterwards -- 
-
+   rows 155-167
 -----------------------------------------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------
 
 -- Mission 3: Updating the departments of each product according to a real grocery list downloading from the internet --
-
+   rows 170-201
 -- Throughout this mission there is a validation check needed to find out where there is no product name --
 -- Since there are only 40 out of 873 rows - which is less than 5 percent - I find it ok to accept this gap --
 -- The final re-editing will be done in the next stage when each product will be dealt specifically -- 
@@ -116,7 +118,7 @@ select min(id), max(id) from dbo.DataCorrections2
 -----------------------------------------------------------------------------------------------------
 
 -- Mission 3b: Creating the main table which will be used in order to modify the department names afterwards --
-
+   rows 203-216
 -- There are 874 rows in the new table I've created -- 
 -- There are some duplications in this table because some products have more than one possible department --
 -- Later on I will drop out the irrelevant rows after validating the correct department --
@@ -124,7 +126,7 @@ select min(id), max(id) from dbo.DataCorrections2
 ------------------------------------------------------------------------------------------
 
 -- Mission 3 validating stage --
-
+   rows 218-233
 -- Validating the main columns in the final table are the same as in the original table --
 -- This validation is needed to show there are no duplications of ids in both tables --
 
@@ -132,7 +134,7 @@ select min(id), max(id) from dbo.DataCorrections2
 --------------------------------------------------------------------------------------
 
 -- Mission 4a: Narrowing the duplications for products with more than one possible department --
-
+   rows 236-259
 -- from this validation check for most of the ingredients we can see there are ids and products that have 2 departments --
 -- this is needed because each product needs to be checked individually and not just up to the main product name --
 -- Another result of this check it that those duplications only apply to 3 departments --
@@ -140,10 +142,10 @@ select min(id), max(id) from dbo.DataCorrections2
 
 -------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------
-
+   
 -- Now I'm going to find out whether there are products whose names needs adjusting and correcting --
 -- The first stage will be validating the department names I've added from GroceryList table are correct --
-
+   rows 261-326
 -- since the meat is one of the double departments I'm first handling the products which have double departments --
 
 -- Upon checking on the internet for the exact pictures of each product I found out that 1 product doesn't fit --
@@ -156,13 +158,13 @@ select min(id), max(id) from dbo.DataCorrections2
 --------------------------------------------------------------------------------------
 
 -- Now I'm doing the same check of doubles I found in the meat department for fish department --
-
+   rows 328-369
 -- After a quick checking i found out all of those products are under the definition of fish --
 
 ---------------------------------------------------------------------------------------
 
 -- Mission 4b: Validating product names are accurate for each department we haven't checked in Mission 4a --
-
+   rows 371-489
 -- Validating for packaged foods department --
 
 -- Right now I am validating the values currently under 'packaged foods' department are accurate  --
@@ -173,13 +175,14 @@ select min(id), max(id) from dbo.DataCorrections2
 
 
 -- Mission 4 Final Validation: Finding out which row numbers should be handled manually --
+   rows 491-511
 -- This table will be used to avoid updating those rows in the next stage --
 
 --------------------------------------------------------------------------------------
 --------------------------------------------------------------------------------------
 
 -- Mission 5: Changing the product names according to the main product names found on mission 2 --
-
+   rows 514-718
 -- This is the stage where I classify most of the products according to the main product's name --
 -- Although for some product it can't be for sure it is way more efficient than going manually for each product --
 -- There I will test for each main product 2 or 3 samples and decide to classify upon those samples --
@@ -192,7 +195,7 @@ select min(id), max(id) from dbo.DataCorrections2
 --------------------------------------------------------------------------------------
 
 -- Mission 6: Making a drill-down for each product and validating all the previous modifications are correct --
-
+   rows 721-1606
 -- After classfying many products according to their main name I'm doing now a drill-down for each specific orpduct --
 -- To do so I'm classifiyng all product names according to their starting letter to make it easier and more accurate --
 -- This validation query is done in order to ensure for each product the department names are accurate --
@@ -201,7 +204,7 @@ select min(id), max(id) from dbo.DataCorrections2
 -------------------------------------------------------------------------------------------------------------------
 
 -- Mission 7: Validating there are no duplications of products with the same trxdate --
-
+   rows 1609-1673
 -- this temp table is used for finding the names of the products who have duplications and might need re-editing --
 
 -- After making a table of all the products who appear more than once I'm finding out all the necccesary details for the prior table --
@@ -223,13 +226,14 @@ select min(id), max(id) from dbo.DataCorrections2
 -------------------------------------------------------------------------------------
 
 -- Mission 8: Adding the real USD/NIS rate to our final table --
-
+   
 -- I've used those functions to find out the date ranges for our data in order to retrive the exact data from internet sources --
 -- In order to set the time right I've searched the internet for the exchange rates in the relevant times --
 -- I've also uploaded a table and combined the actual excjange rates with the data we already have --
 
 -- Mission 8a: Updating trxweekday value for rows which refer to Saturday or Sunday --
-
+   rows 1676-1716
 -- Mission 8b: Finding whether the date value for one column which has null date value can be calculated --
-
+   rows 1718-1728
 -- Mission 8c: Adding the updated trxdate values to create a final table --
+   rows 1730-1746
