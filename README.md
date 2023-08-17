@@ -60,11 +60,10 @@ Now after the excercise introduction I'm writing the comments I've written throu
 -- First of all we need to ensure there are no null values in the new table we're building --
 
 -- From the first inquiry of the valuse in the tables I found out there is only 1 null value which will be omitted afterwards --
--- Besides that only product no. 627 has null values in the trxdate column, though we might be able to find this value by extracting the excahnge rate of this product --
+-- Besides that only id no. 627 has null values in trxdate column, though we might find this value by extracting the excahnge rate of this product --
 -- Later on we will compare it to other products with the same rate and weekday and find out that way the rexdate --
 
 select min(id), max(id) from dbo.DataCorrections2
-min_id=1, max_id=1000
 
 ---- I created another table which contains all the numbers from 1 to 1000. --
 ---- Since there are 854 distinct ids between 1 and 1000 it means there are many missing numbers in the ID column --
@@ -100,7 +99,6 @@ min_id=1, max_id=1000
 -----------------------------------------------------------------------------------------------------
 
 -- Mission 2b: Adding the main names of each product to another table which will be used afterwards -- 
-
 
 -----------------------------------------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------
@@ -189,8 +187,6 @@ min_id=1, max_id=1000
 -- Since the main table dbo.DataCorrections2 has no rn column but the temp table has them it will be done in 2 phases --
 -- In the first phase I will find out which ids are in each row number, then I will update the main table ids --
 
---------------------------------------------------------------------------------------------------------------
-
 --------------------------------------------------------------------------------------
 --------------------------------------------------------------------------------------
 
@@ -198,6 +194,7 @@ min_id=1, max_id=1000
 
 -- After classfying many products according to their main name I'm doing now a drill-down for each specific orpduct --
 -- To do so I'm classifiyng all product names according to their starting letter to make it easier and more accurate --
+-- This validation query is done in order to ensure for each product the department names are accurate --
 
 -------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------
@@ -233,8 +230,5 @@ min_id=1, max_id=1000
 -- Mission 8a: Updating trxweekday value for rows which refer to Saturday or Sunday --
 
 -- Mission 8b: Finding whether the date value for one column which has null date value can be calculated --
-
---delete from dbo.DeptCorrections
---where id = 627 
 
 -- Mission 8c: Adding the updated trxdate values to create a final table --
