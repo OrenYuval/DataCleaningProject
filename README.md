@@ -11,6 +11,7 @@ Now, one of the issues with practice exercises, is the data usually comes clean 
 However, the table in the following link, well... I'm happy to say it's a horrible table full of many errors.
 I originally created this exercise for the current class of Upscale Analytics, but I enjoyed working on it so much, that I'm happy to share it with you too.
 Enjoy!
+
 Shuki"
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
 
