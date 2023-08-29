@@ -1,7 +1,8 @@
 # DataCleaningProject
 Summary:
-I've done this project in order to excercise Data Cleaning Through SQL which was published and created by Shuki Molk.
+I've done this project in order to excercise Data Cleaning Through SQL.
 I found this excercise very interesting and challenging since I haven't practiced data cleaning in earlier courses.
+The excercise was published and created by Shuki Molk.
 I've added a link to the excercise and now I'm starting with the description that Shuki published on a LinkedIn post:
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
